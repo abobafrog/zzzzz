@@ -1,0 +1,36 @@
+from __future__ import annotations
+
+from typing import Any, Literal
+
+from pydantic import BaseModel, Field
+
+
+class ParsedFile(BaseModel):
+    file_name: str
+    file_type: str
+    columns: list[str]
+    rows: list[dict[str, Any]]
+    warnings: list[str] = Field(default_factory=list)
+
+
+class TargetField(BaseModel):
+    name: str
+    type: Literal['string', 'number', 'boolean', 'object', 'array', 'null', 'any']
+
+
+class FieldMapping(BaseModel):
+    source: str | None
+    target: str
+    confidence: Literal['high', 'medium', 'low', 'none']
+    reason: str
+
+
+class GenerationResult(BaseModel):
+    parsed_file: ParsedFile
+    target_fields: list[TargetField]
+    mappings: list[FieldMapping]
+    generated_typescript: str
+    preview: list[dict[str, Any]]
+    warnings: list[str] = Field(default_factory=list)
+    generation_id: int | None = None
+    mode: Literal['guest', 'authorized']
