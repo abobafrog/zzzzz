@@ -676,8 +676,12 @@ input {
 
 .viewer-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 16px;
+}
+
+.viewer-pane {
+  min-width: 0;
 }
 
 .data-grid-wrap,
@@ -701,9 +705,49 @@ input {
 }
 
 .data-grid {
-  width: 100%;
+  width: max-content;
+  min-width: 100%;
   border-collapse: collapse;
   font-size: 13px;
+}
+
+.sheet-tab-row {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 12px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 2px;
+}
+
+.sheet-tab {
+  min-width: 180px;
+  display: grid;
+  gap: 4px;
+  padding: 14px 16px;
+  color: rgba(255, 255, 255, 0.74);
+  text-align: left;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.sheet-tab.active {
+  color: #f7fbff;
+  border-color: rgba(87, 143, 255, 0.72);
+  background: linear-gradient(135deg, rgba(67, 88, 255, 0.26), rgba(96, 54, 194, 0.26));
+  box-shadow: 0 14px 30px rgba(47, 69, 183, 0.2);
+}
+
+.sheet-tab span {
+  font-weight: 700;
+}
+
+.sheet-tab small {
+  color: rgba(255, 255, 255, 0.54);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .data-grid th,
@@ -778,6 +822,11 @@ input {
   background: rgba(255, 91, 127, 0.14);
 }
 
+.confidence.none {
+  color: #c9d3e7;
+  background: rgba(148, 163, 184, 0.16);
+}
+
 .compact {
   min-height: 90px;
   display: grid;
@@ -794,8 +843,13 @@ input {
     padding-bottom: 0;
   }
 
-  .viewer-grid,
   .insight-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 1100px) {
+  .viewer-grid {
     grid-template-columns: 1fr;
   }
 }

@@ -5,11 +5,18 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 
+class ParsedSheet(BaseModel):
+    name: str
+    columns: list[str]
+    rows: list[dict[str, Any]]
+
+
 class ParsedFile(BaseModel):
     file_name: str
     file_type: str
     columns: list[str]
     rows: list[dict[str, Any]]
+    sheets: list[ParsedSheet] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
 
 
@@ -34,3 +41,15 @@ class GenerationResult(BaseModel):
     warnings: list[str] = Field(default_factory=list)
     generation_id: int | None = None
     mode: Literal['guest', 'authorized']
+
+
+class AuthPayload(BaseModel):
+    email: str
+    password: str
+    name: str | None = None
+
+
+class UserProfile(BaseModel):
+    id: str
+    name: str
+    email: str

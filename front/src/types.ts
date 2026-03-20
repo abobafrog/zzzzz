@@ -23,13 +23,20 @@ export type ParsedFileInfo = {
   extension: string;
   columns: string[];
   rows: Record<string, unknown>[];
+  sheets: ParsedSheetInfo[];
   warnings: string[];
+};
+
+export type ParsedSheetInfo = {
+  name: string;
+  columns: string[];
+  rows: Record<string, unknown>[];
 };
 
 export type MappingInfo = {
   source: string;
   target: string;
-  confidence: 'high' | 'medium' | 'low';
+  confidence: 'high' | 'medium' | 'low' | 'none';
   reason?: string;
 };
 

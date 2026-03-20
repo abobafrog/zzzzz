@@ -6,10 +6,36 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
 from generator import build_preview, generate_typescript
 from matcher import map_fields
-from parsers import ParseError, infer_target_fields, parse_file
-from storage import cleanup_expired_guest_files, get_history, save_generation, save_upload
+from models import AuthPayload
+from parsers import ParseError, infer_target_fields, parse_file, resolve_generation_source
+from storage import (
+    InvalidCredentialsError,
+    UserConflictError,
+    cleanup_expired_guest_files,
+    get_history,
+    login_user,
+    register_user,
+    save_generation,
+    save_upload,
+)
 
 router = APIRouter()
+
+
+@router.post('/auth/register')
+def register(payload: AuthPayload) -> dict:
+    try:
+        return register_user(name=payload.name or '', email=payload.email, password=payload.password)
+    except UserConflictError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.post('/auth/login')
+def login(payload: AuthPayload) -> dict:
+    try:
+        return login_user(email=payload.email, password=payload.password)
+    except InvalidCredentialsError as exc:
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
 
 
 @router.post('/generate')
@@ -17,6 +43,7 @@ async def generate(
     file: UploadFile = File(...),
     target_json: str = Form(...),
     user_id: str | None = Form(default=None),
+    selected_sheet: str | None = Form(default=None),
     keep_guest_file: bool = Form(default=False),
 ) -> dict:
     cleanup_expired_guest_files()
@@ -29,10 +56,11 @@ async def generate(
         saved_path = save_upload(file_bytes, filename, mode=mode, user_id=user_id)
         parsed = parse_file(saved_path, filename)
         target_fields, target_payload = infer_target_fields(target_json)
-        mappings, mapping_warnings = map_fields(parsed.columns, target_fields)
+        source_columns, source_rows, source_warnings = resolve_generation_source(parsed, selected_sheet)
+        mappings, mapping_warnings = map_fields(source_columns, target_fields)
         ts_code = generate_typescript(target_fields, mappings)
-        preview = build_preview(parsed.rows, target_fields, mappings)
-        all_warnings = parsed.warnings + mapping_warnings
+        preview = build_preview(source_rows, target_fields, mappings)
+        all_warnings = parsed.warnings + source_warnings + mapping_warnings
 
         generation_id = None
         if user_id:
@@ -46,6 +74,8 @@ async def generate(
                 generated_typescript=ts_code,
                 preview_json=json.dumps(preview, ensure_ascii=False),
                 warnings_json=json.dumps(all_warnings, ensure_ascii=False),
+                parsed_file_json=json.dumps(parsed.model_dump(), ensure_ascii=False),
+                selected_sheet=selected_sheet,
             )
         elif not keep_guest_file:
             saved_path.unlink(missing_ok=True)

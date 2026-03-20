@@ -47,11 +47,14 @@ async function waitForServer(url, attempts = 120) {
 
 const vitePort = await findOpenPort(5180);
 const viteUrl = `http://127.0.0.1:${vitePort}`;
+const childEnv = { ...process.env };
+delete childEnv.ELECTRON_RUN_AS_NODE;
 
 const vite = spawn('npm', ['run', 'dev', '--', '--host', '127.0.0.1', '--port', String(vitePort), '--strictPort'], {
   cwd: rootDir,
   stdio: 'inherit',
-  shell: process.platform === 'win32'
+  shell: process.platform === 'win32',
+  env: childEnv,
 });
 
 let shuttingDown = false;
@@ -71,7 +74,7 @@ try {
   const electron = spawn(electronBinary, ['.'], {
     cwd: rootDir,
     stdio: 'inherit',
-    env: { ...process.env, VITE_DEV_SERVER_URL: viteUrl }
+    env: { ...childEnv, VITE_DEV_SERVER_URL: viteUrl }
   });
 
   electron.on('exit', (code) => {

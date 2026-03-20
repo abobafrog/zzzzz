@@ -9,7 +9,7 @@ from typing import Any
 
 import pandas as pd
 
-from models import ParsedFile, TargetField
+from models import ParsedFile, ParsedSheet, TargetField
 
 PARSER_DIR = Path(__file__).resolve().parent / 'parser'
 if str(PARSER_DIR) not in sys.path:
@@ -30,13 +30,14 @@ def parse_file(file_path: Path, original_name: str | None = None) -> ParsedFile:
     ext = file_path.suffix.lower().lstrip('.')
     original_name = original_name or file_path.name
     warnings: list[str] = []
+    sheets: list[ParsedSheet] = []
 
     logger.info('parse_file started: name=%s ext=%s path=%s', original_name, ext, file_path)
 
     if ext == 'csv':
         columns, rows = _parse_csv(file_path)
     elif ext in {'xlsx', 'xls'}:
-        columns, rows, extra_warnings = _parse_excel(file_path)
+        columns, rows, extra_warnings, sheets = _parse_excel(file_path)
         warnings.extend(extra_warnings)
     elif ext in {'pdf', 'docx'}:
         columns, rows, extra_warnings = _parse_document(file_path)
@@ -61,8 +62,32 @@ def parse_file(file_path: Path, original_name: str | None = None) -> ParsedFile:
         file_type=ext,
         columns=columns,
         rows=rows[:PREVIEW_ROW_LIMIT],
+        sheets=sheets,
         warnings=warnings,
     )
+
+
+def resolve_generation_source(
+    parsed_file: ParsedFile,
+    selected_sheet: str | None = None,
+) -> tuple[list[str], list[dict[str, Any]], list[str]]:
+    if parsed_file.file_type not in {'xlsx', 'xls'} or not parsed_file.sheets:
+        return parsed_file.columns, parsed_file.rows, []
+
+    if selected_sheet is None or selected_sheet.strip() == '':
+        return parsed_file.columns, parsed_file.rows, []
+
+    normalized_name = selected_sheet.strip()
+    for sheet in parsed_file.sheets:
+        if sheet.name == normalized_name:
+            return (
+                sheet.columns,
+                sheet.rows,
+                [f'Generated mapping from selected sheet: {sheet.name}'],
+            )
+
+    available_sheets = ', '.join(sheet.name for sheet in parsed_file.sheets)
+    raise ParseError(f'Worksheet "{selected_sheet}" not found. Available sheets: {available_sheets}')
 
 
 
@@ -90,19 +115,50 @@ def _parse_csv(file_path: Path) -> tuple[list[str], list[dict[str, Any]]]:
 
 
 
-def _parse_excel(file_path: Path) -> tuple[list[str], list[dict[str, Any]], list[str]]:
+def _parse_excel(file_path: Path) -> tuple[list[str], list[dict[str, Any]], list[str], list[ParsedSheet]]:
     warnings: list[str] = []
     engine = 'openpyxl' if file_path.suffix.lower() == '.xlsx' else 'xlrd'
     try:
         excel = pd.ExcelFile(file_path, engine=engine)
-        sheet_name = excel.sheet_names[0]
-        if len(excel.sheet_names) > 1:
-            warnings.append(f'Using first sheet: {sheet_name}')
-        df = pd.read_excel(file_path, sheet_name=sheet_name, engine=engine)
-        df = df.where(pd.notnull(df), None)
-        columns = [str(c) for c in df.columns.tolist()]
-        rows = df.head(PREVIEW_ROW_LIMIT).to_dict(orient='records')
-        return columns, rows, warnings
+        combined_columns: list[str] = []
+        combined_rows: list[dict[str, Any]] = []
+        non_empty_sheets: list[str] = []
+        sheets: list[ParsedSheet] = []
+
+        for sheet_name in excel.sheet_names:
+            df = pd.read_excel(file_path, sheet_name=sheet_name, engine=engine)
+            df = df.where(pd.notnull(df), None)
+            raw_columns = df.columns.tolist()
+            if any(
+                column is None
+                or not isinstance(column, str)
+                or (isinstance(column, str) and (column.strip() == '' or column.startswith('Unnamed:')))
+                for column in raw_columns
+            ):
+                warnings.append(
+                    f'Sheet "{sheet_name}": Excel first row is treated as column headers. Some headers are empty or non-text, so the first row may contain data instead of column names.'
+                )
+
+            columns = [str(column) for column in raw_columns]
+            df.columns = columns
+            rows = [{str(key): value for key, value in row.items()} for row in df.to_dict(orient='records')]
+
+            if not columns and not rows:
+                continue
+
+            non_empty_sheets.append(sheet_name)
+            sheets.append(ParsedSheet(name=sheet_name, columns=columns, rows=rows[:PREVIEW_ROW_LIMIT]))
+            for column in columns:
+                if column not in combined_columns:
+                    combined_columns.append(column)
+            combined_rows.extend(rows)
+
+        if len(non_empty_sheets) > 1:
+            warnings.append(f'Merged {len(non_empty_sheets)} sheets: {", ".join(non_empty_sheets)}')
+        elif len(excel.sheet_names) > 1 and len(non_empty_sheets) == 1:
+            warnings.append(f'Workbook has multiple sheets. Used the only non-empty sheet: {non_empty_sheets[0]}')
+
+        return combined_columns, combined_rows[:PREVIEW_ROW_LIMIT], warnings, sheets
     except Exception as exc:  # noqa: BLE001
         raise ParseError(f'Failed to parse Excel: {exc}') from exc
 

@@ -1,6 +1,7 @@
 import { ArrowRight, KeyRound, LogIn, Mail, ShieldCheck, Sparkles, UserPlus, UserRound } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
+import { loginWithBackend, registerWithBackend } from '../lib/api';
 import type { AuthMode, UserProfile } from '../types';
 import { BrandLogo } from './BrandLogo';
 import { VibeBackground } from './VibeBackground';
@@ -42,23 +43,47 @@ export function AuthScreen({ onComplete }: Props) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
 
   const title = mode === 'register' ? 'Регистрация' : 'Войти в аккаунт';
   const helperText = useMemo(() => {
     if (mode === 'register') {
-      return 'Сохранение истории, расширенные функции и полноценная рабочая сессия доступны после входа.';
+      return 'История генераций и рабочие данные теперь сохраняются в общей базе проекта.';
     }
-    return 'Вход локальный для этого приложения. Можно быстро вернуться к своей полной сессии.';
+    return 'Войдите в существующий аккаунт, чтобы продолжить работу с сохраненной историей.';
   }, [mode]);
 
-  const submit = (event: FormEvent) => {
+  const submit = async (event: FormEvent) => {
     event.preventDefault();
-    onComplete({
-      id: crypto.randomUUID(),
-      name: name.trim() || 'Desktop User',
-      email: email.trim() || 'local@tsgen.app',
-      skipped: false
-    });
+    setError('');
+    setBusy(true);
+
+    try {
+      const normalizedEmail = email.trim();
+      const normalizedPassword = password.trim();
+
+      const profile =
+        mode === 'register'
+          ? await registerWithBackend({
+              name: name.trim(),
+              email: normalizedEmail,
+              password: normalizedPassword,
+            })
+          : await loginWithBackend({
+              email: normalizedEmail,
+              password: normalizedPassword,
+            });
+
+      onComplete({
+        ...profile,
+        skipped: false,
+      });
+    } catch (submissionError) {
+      setError(submissionError instanceof Error ? submissionError.message : 'Не удалось выполнить вход.');
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -81,11 +106,11 @@ export function AuthScreen({ onComplete }: Props) {
           </div>
 
           <div className="auth-hero-copy">
-            <p className="auth-kicker">Новый стартовый экран</p>
-            <h2>Красивый запуск, две сессии и акцент на входе.</h2>
+            <p className="auth-kicker">Обновленная сессия</p>
+            <h2>Один проект, одна база, нормальная история генераций.</h2>
             <p className="subtle-text auth-hero-text">
-              При открытии приложения появляется анимированный загрузчик по центру, дальше — экран выбора.
-              Гость попадает в облегчённую сессию, а зарегистрированный пользователь получает полный набор функций.
+              Приложение больше не держит авторизацию только локально. Пользовательские аккаунты и история генераций теперь
+              живут в SQLite-слое проекта и могут использовать общую доменную модель.
             </p>
           </div>
 
@@ -95,8 +120,8 @@ export function AuthScreen({ onComplete }: Props) {
                 <ShieldCheck size={16} />
               </div>
               <div>
-                <strong>Две отдельные сессии</strong>
-                <span>Guest mode с ограничениями и полный режим после регистрации.</span>
+                <strong>Реальные пользователи</strong>
+                <span>Регистрация и вход теперь идут через backend и сохраняются в общей базе данных.</span>
               </div>
             </div>
             <div className="auth-feature-item">
@@ -104,8 +129,8 @@ export function AuthScreen({ onComplete }: Props) {
                 <Sparkles size={16} />
               </div>
               <div>
-                <strong>Фон на весь экран</strong>
-                <span>Эффект VibeBackground растянут на всю сцену и работает как живая подложка.</span>
+                <strong>Единая история</strong>
+                <span>Генерации, версии и метаданные сохраняются рядом с остальными сущностями проекта.</span>
               </div>
             </div>
           </div>
@@ -123,10 +148,24 @@ export function AuthScreen({ onComplete }: Props) {
             <p className="subtle-text auth-copy auth-copy-v2">{helperText}</p>
 
             <div className="mode-switch mode-switch-v2">
-              <button className={mode === 'register' ? 'active' : ''} onClick={() => setMode('register')} type="button">
+              <button
+                className={mode === 'register' ? 'active' : ''}
+                onClick={() => {
+                  setMode('register');
+                  setError('');
+                }}
+                type="button"
+              >
                 Регистрация
               </button>
-              <button className={mode === 'login' ? 'active' : ''} onClick={() => setMode('login')} type="button">
+              <button
+                className={mode === 'login' ? 'active' : ''}
+                onClick={() => {
+                  setMode('login');
+                  setError('');
+                }}
+                type="button"
+              >
                 Вход
               </button>
             </div>
@@ -163,9 +202,11 @@ export function AuthScreen({ onComplete }: Props) {
                 value={password}
               />
 
-              <button className="primary-btn primary-btn-v2" type="submit">
+              {error && <div className="warning-item">{error}</div>}
+
+              <button className="primary-btn primary-btn-v2" disabled={busy} type="submit">
                 {mode === 'register' ? <UserPlus size={16} /> : <LogIn size={16} />}
-                <span>{mode === 'register' ? 'Зарегистрироваться' : 'Войти'}</span>
+                <span>{busy ? 'Подождите...' : mode === 'register' ? 'Зарегистрироваться' : 'Войти'}</span>
               </button>
             </form>
 

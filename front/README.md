@@ -1,73 +1,58 @@
-# React + TypeScript + Vite
+# TSGen Desktop Client
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Electron desktop client built with React and Vite.
 
-Currently, two official plugins are available:
+## What it does
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- lets the user register or log in through the backend
+- uploads CSV, XLSX, XLS, PDF, and DOCX files
+- previews spreadsheet data, including separate Excel sheet tabs
+- sends the active Excel sheet to the backend for generation
+- shows generated TypeScript, preview JSON, warnings, and saved history
 
-## React Compiler
+## Runtime assumptions
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- the backend must be available at `http://127.0.0.1:8000`
+- in Electron mode the frontend talks to that backend directly
+- in plain Vite dev mode, `/api` and `/health` are proxied through [vite.config.ts](/abs/path/c:/Users/user/Desktop/123/front/vite.config.ts)
 
-## Expanding the ESLint configuration
+## Main commands
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+From [package.json](/abs/path/c:/Users/user/Desktop/123/front/package.json):
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```powershell
+cd c:\Users\user\Desktop\123\front
+npm install
+npm run electron:dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Useful alternatives:
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+```powershell
+npm run build
+npm run dev
+npm run electron:start
+```
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## Dev flow
+
+- `npm run electron:dev` starts a Vite dev server on the first free port beginning from `5180`
+- the Electron launcher passes that dev-server URL into [electron/main.cjs](/abs/path/c:/Users/user/Desktop/123/front/electron/main.cjs)
+- the client uses [api.ts](/abs/path/c:/Users/user/Desktop/123/front/src/lib/api.ts) for backend requests
+
+## Important files
+
+- [src/App.tsx](/abs/path/c:/Users/user/Desktop/123/front/src/App.tsx): app shell and auth/workspace switching
+- [src/components/AuthScreen.tsx](/abs/path/c:/Users/user/Desktop/123/front/src/components/AuthScreen.tsx): register/login screen
+- [src/components/Workspace.tsx](/abs/path/c:/Users/user/Desktop/123/front/src/components/Workspace.tsx): upload, preview, generation, history UI
+- [src/lib/api.ts](/abs/path/c:/Users/user/Desktop/123/front/src/lib/api.ts): backend API calls and timeouts
+- [src/styles.css](/abs/path/c:/Users/user/Desktop/123/front/src/styles.css): desktop UI styling
+- [electron/main.cjs](/abs/path/c:/Users/user/Desktop/123/front/electron/main.cjs): Electron main process
+- [scripts/electron-dev.mjs](/abs/path/c:/Users/user/Desktop/123/front/scripts/electron-dev.mjs): dev launcher
+
+## Verification
+
+```powershell
+cd c:\Users\user\Desktop\123\front
+npm run build
 ```

@@ -8,10 +8,13 @@ const electronBinary =
   process.platform === 'win32'
     ? path.join(rootDir, 'node_modules', 'electron', 'dist', 'electron.exe')
     : path.join(rootDir, 'node_modules', 'electron', 'dist', 'electron');
+const childEnv = { ...process.env };
+delete childEnv.ELECTRON_RUN_AS_NODE;
 
 const electron = spawn(electronBinary, ['.'], {
   cwd: rootDir,
-  stdio: 'inherit'
+  stdio: 'inherit',
+  env: childEnv
 });
 
 electron.on('exit', (code) => {

@@ -1,73 +1,92 @@
-# MVP backend на Python
+# MVP Backend
 
-Минимальный бэкенд для генератора маппинга из CSV/XLS/XLSX в target JSON с генерацией TypeScript.
+FastAPI backend for file-to-TypeScript generation.
 
-## Что умеет
+## Supported input files
 
-- принимает `csv`, `xlsx`, `xls`
-- разбирает файл во внутренний формат
-- принимает `target JSON`
-- сопоставляет колонки без LLM
-- генерирует TypeScript по шаблону
-- строит preview по первым 2–3 строкам
-- сохраняет историю для авторизованного пользователя
-- хранит файлы гостя временно с TTL
+- `csv`
+- `xlsx`
+- `xls`
+- `pdf`
+- `docx`
 
-## Структура
+## What the backend does
 
-- `app.py` — точка входа FastAPI
-- `routes.py` — API endpoints
-- `parsers.py` — разбор файлов и target JSON
-- `matcher.py` — сопоставление полей
-- `generator.py` — генерация TypeScript и preview
-- `storage.py` — SQLite + файловое хранение
-- `requirements.txt` — зависимости
+- accepts an uploaded file and a target JSON schema
+- parses the source file into a normalized internal format
+- returns preview data and warnings
+- matches source columns to target fields
+- generates a TypeScript `transform()` function
+- stores users, generations, versions, and artifacts in SQLite
+- imports legacy history from `mvp_backend/.runtime/history.db` into `mvp_backend/.runtime/app.sqlite`
 
-## Запуск
+## Excel behavior
 
-```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-uvicorn app:app --reload
+- every Excel sheet is exposed through `parsed_file.sheets`
+- `parsed_file.columns` and `parsed_file.rows` still contain the merged workbook preview
+- generation can target a specific sheet through the `selected_sheet` form field
+- if no sheet is selected, generation falls back to the merged workbook preview
+- if Excel headers are empty, numeric, or `Unnamed:*`, the backend adds a warning
+
+## Main files
+
+- [app.py](/abs/path/c:/Users/user/Desktop/123/mvp_backend/app.py): FastAPI entrypoint
+- [routes.py](/abs/path/c:/Users/user/Desktop/123/mvp_backend/routes.py): API routes
+- [parsers.py](/abs/path/c:/Users/user/Desktop/123/mvp_backend/parsers.py): file parsing and sheet selection
+- [matcher.py](/abs/path/c:/Users/user/Desktop/123/mvp_backend/matcher.py): field matching logic
+- [generator.py](/abs/path/c:/Users/user/Desktop/123/mvp_backend/generator.py): TypeScript and preview generation
+- [storage.py](/abs/path/c:/Users/user/Desktop/123/mvp_backend/storage.py): uploads, auth, history, SQLite persistence
+- [infra/database.py](/abs/path/c:/Users/user/Desktop/123/mvp_backend/infra/database.py): SQLite client
+- [infra/schema.sql](/abs/path/c:/Users/user/Desktop/123/mvp_backend/infra/schema.sql): database schema
+
+## Run locally
+
+Run from the backend directory because imports in [app.py](/abs/path/c:/Users/user/Desktop/123/mvp_backend/app.py) are local-module imports:
+
+```powershell
+cd c:\Users\user\Desktop\123\mvp_backend
+..\.venv\Scripts\python.exe -m uvicorn app:app --host 127.0.0.1 --port 8000 --reload
 ```
 
-## Эндпоинты
+Health check:
+
+```powershell
+Invoke-WebRequest http://127.0.0.1:8000/health -UseBasicParsing
+```
+
+Expected response body:
+
+```json
+{"status":"ok"}
+```
+
+## API
+
+- `POST /api/auth/register`
+- `POST /api/auth/login`
+- `POST /api/generate`
+- `GET /api/history/{user_id}`
+- `GET /health`
 
 ### `POST /api/generate`
 
-`multipart/form-data`:
+`multipart/form-data`
 
-- `file`: файл `csv/xlsx/xls`
-- `target_json`: JSON-строка
-- `user_id`: optional, если есть — считаем пользователя авторизованным
-- `keep_guest_file`: optional boolean, по умолчанию `false`
+Fields:
 
-Пример cURL:
+- `file`: uploaded source file
+- `target_json`: target schema as a JSON string
+- `user_id`: optional authorized user id
+- `selected_sheet`: optional sheet name for Excel generation
+- `keep_guest_file`: optional, defaults to `false`
 
-```bash
-curl -X POST "http://127.0.0.1:8000/api/generate" \
-  -F 'file=@./example.csv' \
-  -F 'target_json={"customerName":"","amount":0,"createdAt":""}' \
-  -F 'user_id=user-123'
+## Tests
+
+From the repository root:
+
+```powershell
+cd c:\Users\user\Desktop\123
+.\.venv\Scripts\python.exe -m unittest mvp_backend.test_parsers mvp_backend.test_matcher mvp_backend.test_generate
 ```
 
-### `GET /api/history/{user_id}`
-
-Возвращает историю генераций пользователя.
-
-## Логика маппинга
-
-1. normalized exact match
-2. contains match
-3. token overlap
-4. similarity fallback
-5. warning, если колонка не найдена
-
-## Ограничения MVP
-
-- берется только первый лист Excel
-- preview строится только по первым 3 строкам
-- сложный semantic mapping не реализован
-- auth упрощен до передачи `user_id`
-- TypeScript шаблон статический
+`mvp_backend.test_generate` is a live smoke test and skips automatically if the backend is not running on `127.0.0.1:8000`.

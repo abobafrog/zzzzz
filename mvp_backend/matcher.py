@@ -74,6 +74,23 @@ def map_fields(source_columns: list[str], target_fields: list[TargetField]) -> t
         mappings.append(FieldMapping(source=None, target=target.name, confidence='none', reason='not_found'))
         warnings.append(f'No source column found for target "{target.name}"')
 
+    if _should_use_position_fallback(source_columns, target_fields, mappings):
+        fallback_mappings = [
+            FieldMapping(
+                source=source_columns[index],
+                target=target_fields[index].name,
+                confidence='low',
+                reason='position_fallback',
+            )
+            for index in range(len(target_fields))
+        ]
+        return (
+            fallback_mappings,
+            [
+                'No semantic column matches found. Used column-order fallback because source and target have the same number of fields.'
+            ],
+        )
+
     return mappings, warnings
 
 
@@ -87,3 +104,14 @@ def tokenize(value: str) -> list[str]:
     with_boundaries = CAMEL_BOUNDARY_RE.sub(' ', value)
     parts = TOKEN_SPLIT_RE.split(with_boundaries.lower())
     return [p for p in parts if p]
+
+
+def _should_use_position_fallback(
+    source_columns: list[str],
+    target_fields: list[TargetField],
+    mappings: list[FieldMapping],
+) -> bool:
+    if not source_columns or len(source_columns) != len(target_fields):
+        return False
+
+    return all(mapping.source is None for mapping in mappings)
